@@ -3,29 +3,32 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 
-load_dotenv('data.env')
+load_dotenv()
 
 api_key = os.getenv("OPENAI_API_KEY")
-prompt = os.getenv("SYSTEM_PROMPT")
-temperature = os.getenv("TEMPERATURE")
+system_prompt = os.getenv("SYSTEM_PROMPT")
+temperature = float(os.getenv("TEMPERATURE", 0.7))
 
 client = OpenAI(api_key=api_key)
 
 dialog_history = []
 
-def get_response(text: str, dialog_history: list, client: OpenAI):
-    dialog_history.append({"role": "user", "content": text})
+def get_response(user_text: str, dialog_history: list, client: OpenAI):
+    dialog_history.append({"role": "user", "content": user_text})
 
     if len(dialog_history) > 6:
         dialog_history.pop(0)
 
+    input_messages = [{"role": "system", "content": system_prompt}] + dialog_history
+
     response = client.responses.create(
-        model="gpt-4.1-nano",
-        input=dialog_history,
-        temperature=float(temperature)
+        model="gpt-5-nano",
+        input=input_messages,
+        temperature=temperature
     )
 
     ai_message = response.output_text
+
     dialog_history.append({"role": "assistant", "content": ai_message})
 
     return ai_message
