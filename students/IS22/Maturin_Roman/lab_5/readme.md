@@ -198,7 +198,7 @@ criterion = nn.CrossEntropyLoss()
 ## Задание 5
 
 Модель была экспортирована с сохранением всей архитектуры. 
-Содержание файла CIFAR100_CNN.onxx показано ниже:
+Содержание файла CIFAR100_CNN.onnx показано ниже:
 
 ```python
 x = torch.randn(1, 32, 32, 3, requires_grad=True).to(device)
