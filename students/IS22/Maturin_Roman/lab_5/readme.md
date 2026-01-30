@@ -197,7 +197,24 @@ criterion = nn.CrossEntropyLoss()
 
 ## Задание 5
 
-Модель была сохранена с сохранением всей архитектуры
+Модель была сохранена с сохранением всей архитектуры. 
+Содержание файла onxx.CIFAR100 показано ниже:
+
+```python
+x = torch.randn(1, 32, 32, 3, requires_grad=True).to(device)
+torch_out = model(x)
+
+torch.onnx.export(model,
+                  x,
+                  "cifar100_CNN.onnx",
+                  export_params=True,
+                  opset_version=9,
+                  do_constant_folding=True,
+                  input_names = ['input'],
+                  output_names = ['output'],
+                  dynamic_axes={'input' : {0 : 'batch_size'},
+                                'output' : {0 : 'batch_size'}})
+```
 
 ## Вывод
 
