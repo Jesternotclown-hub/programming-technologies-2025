@@ -20,9 +20,35 @@
 Повысить точность модели с 88.00% до 91% путем добавления слоев BancNorm2d и изменения аргументов stride и padding в первом сверточном слое.
 
 ```python
-x = input / 255.0
-x = (x - self.mean) / self.std
-return x.permute(0, 3, 1, 2)
+class Normalize(nn.Module):
+    def __init__(self, mean, std):
+        super(Normalize, self).__init__()
+        self.mean = torch.tensor(mean)
+        self.std = torch.tensor(std)
+
+    def forward(self, input):
+        x = input / 255.0
+        x = x - self.mean
+        x = x / self.std
+        return torch.flatten(x, start_dim=1) # nhwc -> nm
+
+class Cifar100_MLP(nn.Module):
+    def __init__(self, hidden_size=32, classes=100):
+        super(Cifar100_MLP, self).__init__()
+        self.norm = Normalize([0.5074,0.4867,0.4411],[0.2011,0.1987,0.2025])
+        self.seq = nn.Sequential(
+            nn.Linear(32*32*3, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, classes),
+        )
+
+    def forward(self, input):
+        x = self.norm(input)
+        return self.seq(x)
+
+HIDDEN_SIZE = 10
+model = Cifar100_MLP(hidden_size=HIDDEN_SIZE, classes=len(CLASSES))
+model
 ```
 
 ## Задание 3
