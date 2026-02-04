@@ -11,9 +11,50 @@
 4. Выбрать лучшую конфигурацию.
 5. Сохранить модель.
 
-## Ход работы
+## 1. Подготовка окружения и данных
+
+Подключены основные библиотеки PyTorch, NumPy, инструменты визуализации и ONNX:
+```python
+import numpy as np
+import torch
+import torch.optim as optim
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import TensorDataset, DataLoader
+from torchsummary import summary
+import pickle
+from sklearn.metrics import classification_report
+from PIL import Image
+from tqdm.auto import tqdm
+from IPython.display import clear_output
+import matplotlib.pyplot as plt
+%matplotlib inline
+```
+
+## Задание 1
+
+Для ускорения обучения проверена доступность GPU (`!nvidia-smi`) и выбран `device`:
+
+```python
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
+```
 
 ![alt text](Images/1.png)
+
+Выбранные классы по варианту:
+
+Согласно варианту, были выбраны 3 класса из набора данных CIFAR-100:
+Класс № [Номер группы + 11] = [Название класса]
+Класс № [Номер варианта + 37] = [Название класса]
+
+```
+CLASSES = [0, 33, 50]
+```
+
+Пример изображения из выборки CIFAR100:
+
+![alt text](Images/0.png)
 
 ## Задание 2
 
@@ -23,32 +64,55 @@
 class Normalize(nn.Module):
     def __init__(self, mean, std):
         super(Normalize, self).__init__()
-        self.mean = torch.tensor(mean)
-        self.std = torch.tensor(std)
+        self.mean = torch.tensor(mean).to(device)
+        self.std = torch.tensor(std).to(device)
 
     def forward(self, input):
         x = input / 255.0
         x = x - self.mean
         x = x / self.std
-        return torch.flatten(x, start_dim=1) # nhwc -> nm
+        return x.permute(0, 3, 1, 2) # nhwc -> nchw
 
-class Cifar100_MLP(nn.Module):
+class GlobalMaxPool2d(nn.Module):
+    def __init__(self):
+        super(GlobalMaxPool2d, self).__init__()
+
+    def forward(self, input):
+        out = F.adaptive_max_pool2d(input, output_size=1)
+        return out.flatten(start_dim=1)
+
+class Cifar100_CNN(nn.Module):
     def __init__(self, hidden_size=32, classes=100):
-        super(Cifar100_MLP, self).__init__()
-        self.norm = Normalize([0.5074,0.4867,0.4411],[0.2011,0.1987,0.2025])
+        super(Cifar100_CNN, self).__init__()
+        self.hidden_size = hidden_size
+        self.classes = classes
         self.seq = nn.Sequential(
-            nn.Linear(32*32*3, hidden_size),
+            Normalize([0.5074,0.4867,0.4411],[0.2011,0.1987,0.2025]),
+
+            nn.Conv2d(3, HIDDEN_SIZE, 5, stride=2, padding=2),
+            nn.BatchNorm2d(HIDDEN_SIZE),
+            nn.Dropout(0.4),
             nn.ReLU(),
-            nn.Linear(hidden_size, classes),
+
+            nn.Conv2d(HIDDEN_SIZE, HIDDEN_SIZE*2, 3, stride=1, padding=1),
+            nn.BatchNorm2d(HIDDEN_SIZE*2),
+            nn.ReLU(),
+
+            nn.MaxPool2d(4),
+            nn.Flatten(),
+
+            nn.Linear(2048, classes),
         )
 
     def forward(self, input):
-        x = self.norm(input)
-        return self.seq(x)
+        return self.seq(input)
 
-HIDDEN_SIZE = 10
-model = Cifar100_MLP(hidden_size=HIDDEN_SIZE, classes=len(CLASSES))
+HIDDEN_SIZE = 64
+model = Cifar100_CNN(hidden_size=HIDDEN_SIZE, classes=len(CLASSES))
+model.to(device)
 model
+print(model(torch.rand(1, 32, 32, 3).to(device)))
+summary(model, input_size=(32, 32, 3))
 ```
 
 ## Задание 3
@@ -198,7 +262,6 @@ criterion = nn.CrossEntropyLoss()
 ## Задание 5
 
 Модель была экспортирована с сохранением всей архитектуры. 
-Содержание файла CIFAR100_CNN.onnx показано ниже:
 
 ```python
 x = torch.randn(1, 32, 32, 3, requires_grad=True).to(device)
@@ -218,8 +281,8 @@ torch.onnx.export(model,
 
 ## Вывод
 
-В процессе выполнения работы удалось познакомится с новой архитектурой нейронных сетей. Сверточные нейронные сети. Так же в рамках выполнение были изучены способы свертки сети и способы сохранения модели для последующего переиспользования.
+В ходе лабораторной работы была разработана и обучена свёрточная нейронная сеть для классификации изображений датасета CIFAR-100 по трём выбранным классам с использованием GPU. Были экспериментально исследованы три метода уменьшения пространственной размерности карт признаков: агрессивный шаг свёртки (stride), максимизирующий пулинг (MaxPooling) и усредняющий пулинг (AvgPooling).
 
-Для возможности переноса модели использовалась библиотека onnx. С ее помощью была экспортирована сохраненная модель, что потенциально позволяет использовать ее в таких фреймворках как Tensorflow или scikit-learn.
+Результаты показали, что MaxPooling является наиболее эффективной стратегией для данной задачи. Она обеспечивает наилучшее качество классификации (тестовая точность 91,67%) благодаря способности сохранять наиболее информативные признаки и подавлять шум, а также демонстрирует наименьшие признаки переобучения. Стратегия stride, хотя и обучается быстрее всего, приводит к значительной потере информации и сильному переобучению. AvgPooling показывает средние результаты, но уступает MaxPooling в точности, возможно, из-за чрезмерного сглаживания важных деталей.
 
-
+Лучшая модель на основе MaxPooling была успешно экспортирована в формат ONNX, что позволяет использовать её в различных производственных средах.
