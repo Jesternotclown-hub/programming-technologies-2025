@@ -54,7 +54,7 @@ CLASSES = [0, 33, 50]
 
 Пример изображения из выборки CIFAR100:
 
-![alt text](Images/0.png)
+![alt text](Images/0.jpg)
 
 ## Задание 2
 
